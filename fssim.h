@@ -8,7 +8,7 @@
 #define DIRITEMSIZE 32
 #define DIRNUM (1UL<<7)
 #define i2Inode(i) ((inode_t*)(inode+i*INODESIZE))
-#define i2Block(i) ((char*)((blockdata+i*BLOCKSIZE)))
+#define i2Block(i) ((block*)((blockdata+i*BLOCKSIZE)))
 
 typedef struct SB
 {
@@ -24,7 +24,7 @@ typedef union BLOCK
 typedef struct INODE
 {
 	unsigned int flag; //设置最低位为有效位，次低位是文件种类
-	int size;
+	unsigned int  size;
 	int boc_data1; //如果是目录文件，只有该指针有效
 	int boc_data2;
 	int boc_data3;

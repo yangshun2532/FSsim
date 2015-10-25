@@ -15,131 +15,6 @@ int threshold = 1<<17;
 int inodeOfCurDir=0;
 inode_t* curInode=NULL;
 
-int adddir(char* filename)
-{
-	dir_item_t *curdir= (dir_item_t*)i2Block(i2Inode(inodeOfCurDir)->boc_data1);
-   	for (i = 0; i<DIRNUM; i++)
-		{
-			if (curdir[i].valid == 0)
-			{
-				int fid = getNewInode();
-				inode_t* tmp = i2Inode(fid);
-				tmp->flag = 3;
-				strcpy(curdir[i].fileName,filename);
-				curdir[i].inodeIndex=fid; //增加新条目
-				curdir[i].valid = 1; 
-				break;
-			}
-		}
-	if(i==DIRNUM)
-	{
-		printf("dir number is full\n");
-		return -1;
-	}
-
-}
-int simWrite(int inode,int offset,int size)
-{
-
-}
-int simRead(int inode,int offset,int size)
-{
-	
-}
-
-/*
-filename必须是相对路径
-ptr1->4kb
-ptr2->4kb
-ptr3->4MB
-ptr4->4MB
-ptr5->4kb->4MB
-*/
-int mycreate(char* filename,unsigned int size);
-{
-	if(size>4096*1024*(1024+2)+4096*2)
-	{
-		printf("file is too large\n");
-		return -1;
-	}
-	int adddir(char* filename);
-	if(adddir==-1)
-		return -1;
-	int fid ＝ getInode(filename);
-	inode_t* inode = i2Inode(fid);
-	inode->size = size;
-	int* tmp = &inode->boc_data1;
-	int small = size<<10>>10;
-	int big = size>>22;
-	if(size>4096*2)
-	{
-		small = 0;
-		big++;
-	}
-	if(small>4096)
-	{
-		int blockid0 = getNewBlcok(0);
-		int blockid1 = getNewBlcok(0);
-		tmp[0] = blockid0;
-		tmp[1] = blockid1;
-	}
-	else
-	{
-		int blockid0 = getNewBlcok(0);
-		tmp[0]  = blockid0;
-	}
-	if(big>0)
-	{
-		int blockid = getNewInode(1);
-		tmp[2] = blockid;
-		if(big>1)
-		{
-			blockid = getNewBlcok(1);
-			tmp[3] = blockid;
-		}
-		if(big>2)
-		{
-			int tmp = big-2;
-			int h;
-			blockid = getNewBlcok(0);
-			tmp[4] = blockid;
-			block* indexfile = i2Block(blockid);
-			for(h=0;h<tmp;h++)
-			{
-				blockid = getNewBlcok(1);
-				indexfile->index[h] = blockid;
-			}
-		}
-	}
-	return fid;
-} 
-
-int mywrite(char* filename,int offset,int size)
-{
-	int curnode = getInode(filename);
-	if(curnode=-1)
-	{
-		curnode =  create(filename,offset+size);
-	}
-	if(simWrite(curnode,offset,size)==-1)
-		return-1;
-}
-int myread(char* filename,int offset,int size)
-{
-	int curnode = getInode(filename);
-	if(curnode = -1)
-	{
-		printf("No such file\n");
-		return -1;
-	}
-	else
-	{
-		if(simRead(curnode,offset,size)==-1)
-			return -1;
-	}
-	return 0;
-}
-
 int getNewInode()
 {
 	int i;
@@ -159,7 +34,7 @@ int getNewInode()
 int  freeInode(int i)
 {
 	inode_t* tmp = (inode_t*)(inode+i*INODESIZE);
-	tmp->flag = 0;
+	memset(tmp,0,INODESIZE);
 	return 0;
 }
 
@@ -209,7 +84,7 @@ int getNewBlcok(int flag)
 					break;
 				}
 			}
-			if(j==1024)
+			if(j==128)
 			{
 				printf("find a big block\n");
 				tmp = (unsigned char *)(bitmap+(i>>3));
@@ -289,7 +164,7 @@ int freeBlock(int i,int flag)
 }
 
 // 通过路径名获取文件id
-int getInode(const char *name)
+int getInode(char *name)
 {
 	char filename[24]={0};
 	int len = strlen(name);
@@ -306,11 +181,15 @@ int getInode(const char *name)
 		{
 			if(strlen(filename)!=0)
 			{
+				if((i2Inode(curnode)->flag & 2) == 2)
+				{
+					printf("%s is a file\n",filename);
+				}
 				dir_item_t *curdir= (dir_item_t*)i2Block(i2Inode(curnode)->boc_data1);
 				int i;
 				for (i = 0; i < DIRNUM; i++)
 				{
-					if ((curdir[i].valid == 1) &&
+					if ((curdir[i].valid  == 1) &&
 					strcmp(curdir[i].fileName, filename) == 0)
 					{
 						curnode = curdir[i].inodeIndex;
@@ -320,6 +199,7 @@ int getInode(const char *name)
 				if(i==DIRNUM)
 				{
 					printf("cann't find the dir");
+					return -1;
 				}
 				memset(filename,0,24);
 				k=0;
@@ -332,12 +212,17 @@ int getInode(const char *name)
 	}
 	if(strlen(filename)!=0)
 	{
+		if((i2Inode(curnode)->flag & 2) == 2)
+		{
+			printf("%s is a file\n",filename);
+			return -1;
+		}
 		dir_item_t *curdir= (dir_item_t*)i2Block(i2Inode(curnode)->boc_data1);
 		int i;
 		for (i = 0; i < DIRNUM; i++)
 		{
 			printf("%d: %d %s\n",i,curdir[i].valid,curdir[i].fileName);
-			if ((curdir[i].valid == 1) &&
+			if ((curdir[i].valid  == 1) &&
 			strcmp(curdir[i].fileName, filename) == 0)
 			{
 				curnode = curdir[i].inodeIndex;
@@ -346,12 +231,141 @@ int getInode(const char *name)
 		}
 		if(i==DIRNUM)
 		{
-			printf("cann't find the dir");
+			printf("cann't find the dir\n");
+			return -1;
 		}
 		memset(filename,0,24);
 		k=0;
 	}
 	return curnode;
+}
+
+int adddir(char* filename)
+{
+	int i;
+	dir_item_t *curdir= (dir_item_t*)i2Block(i2Inode(inodeOfCurDir)->boc_data1);
+   	for (i = 0; i<DIRNUM; i++)
+		{
+			if (curdir[i].valid == 0)
+			{
+				int fid = getNewInode();
+				inode_t* tmp = i2Inode(fid);
+				tmp->flag = 3;
+				strcpy(curdir[i].fileName,filename);
+				curdir[i].inodeIndex=fid; //增加新条目
+				curdir[i].valid = 1; 
+				break;
+			}
+		}
+	if(i==DIRNUM)
+	{
+		printf("dir number is full\n");
+		return -1;
+	}
+	return 0;
+}
+int simWrite(int inode,int offset,int size)
+{
+	return 0;
+}
+int simRead(int inode,int offset,int size)
+{
+	return 0;
+}
+
+/*
+filename必须是相对路径
+ptr1->4kb
+ptr2->4kb
+ptr3->4MB
+ptr4->4MB
+ptr5->4kb->4MB
+*/
+int mycreate(char* filename,unsigned int size)
+{
+	if(adddir(filename)==-1)
+	{
+		printf("fail to add dir\n");
+		return -1;
+
+	}
+	int fid=getInode(filename);
+	inode_t* curinode = i2Inode(fid);
+//	printf("%u\n",size);
+	curinode->size = size;
+	int* tmp = &(curinode->boc_data1);
+	int small = (size<<10)>>10;
+//	printf("%d\n",small);
+	int big = size>>22;
+//	printf("%d\n",big);
+	if(size>4096*2)
+	{
+		small = 0;
+		big++;
+	}
+	if(small>4096)
+	{
+		int blockid0 = getNewBlcok(0);
+		int blockid1 = getNewBlcok(0);
+		tmp[0] = blockid0;
+		tmp[1] = blockid1;
+	}
+	else
+	{
+		int blockid0 = getNewBlcok(0);
+		tmp[0]  = blockid0;
+	}
+	if(big>0)
+	{
+		int blockid = getNewBlcok(1);
+		tmp[2] = blockid;
+		if(big>1)
+		{
+			blockid = getNewBlcok(1);
+			tmp[3] = blockid;
+		}
+		if(big>2)
+		{
+			int count = big-2;
+			int h;
+			blockid = getNewBlcok(0);
+			tmp[4] = blockid;
+			block* indexfile = i2Block(blockid);
+			for(h=0;h<count;h++)
+			{
+				blockid = getNewBlcok(1);
+				indexfile->index[h] = blockid;
+			}
+		}
+	}
+	return fid;
+} 
+
+int mywrite(char* filename,int offset,int size)
+{
+	int curnode = getInode(filename);
+	if(curnode==-1)
+	{
+		curnode =  mycreate(filename,offset+size);
+	}
+	if(simWrite(curnode,offset,size)==-1)
+		return-1;
+	return 0;
+}
+int myread(char* filename,int offset,int size)
+{
+	int curnode = getInode(filename);
+	if(curnode == -1)
+	{
+		printf("No such file\n");
+		return -1;
+	}
+	else
+	{
+		if(simRead(curnode,offset,size)==-1)
+			return -1;
+	}
+	return 0;
 }
 
 //初始化根目录
@@ -445,7 +459,7 @@ int main(int argc, char **argv)
    			dir_item_t *curdir= (dir_item_t*)i2Block(i2Inode(inodeOfCurDir)->boc_data1);
    			for (i = 0; i<DIRNUM; i++)
 				{
-					if (curdir[i].valid == 1)
+					if ((curdir[i].valid & 1)== 1)
 					{
 						printf("%s\n",curdir[i].fileName);
 					}
@@ -455,9 +469,20 @@ int main(int argc, char **argv)
    		{
    			char filename[100];
    			scanf("%s",filename);
-   			int fid = getInode(filename);
-   			printf("in func cd ,fid: %d\n",fid);
-   			inodeOfCurDir = fid;
+   			int fid;
+   			if((fid = getInode(filename))!=-1)
+   			{
+   				inode_t* tmp = i2Inode(fid);
+   				if((tmp->flag&2)==2)
+   				{
+   					printf("%s is a file\n",filename);
+   				}
+   				else
+   				{
+   					printf("in func cd ,fid: %d\n",fid);
+   					inodeOfCurDir = fid;
+   				}
+   			}
    		}
    }
 }
